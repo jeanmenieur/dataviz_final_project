@@ -1,0 +1,282 @@
+---
+title: "Mini-Project 02"
+output: 
+  html_document:
+    keep_md: true
+    toc: true
+    toc_float: true
+---
+
+# Data Visualization Project 02
+
+# 1. Introduction
+
+Although commercially the most popular fuels for the past 70+ years had been gasoline and diesel, during the last 20 years cars manufacturers and technicians had incorporated other type of fuels which are cheaper and cleaner to produce and to run. As those benefits are directly transfered to final consumers, the use of those fuels had grown. As an example we have Ethanol (E85), Hydrogen (Fuel Cell) and in other countries, Propane Gas (LPG) and Natural Gas.
+
+But the is another alternative "fuel" that had been chatching up the attention of people, and it is Electric-powered vehicles. As electric vehicles are cheaper to run and have a simpler propulsion system, people are seeing that it is feasible to  use those cars.
+
+This type of propulsion system had been developed and used from the 90s decade, as a support to run gasoline and diesel cars with more fuel economy, as Hybrid Cars. But batteries development in terms of energy density, charging cycles and speed, cooling and reliability, had led to put them as the only (or main) source of energy for cars and it had been a success during the 2010s decade.
+
+In this project, we are going to focus on one of the main concerns of Electric Vehicles (EVs): where to charge them. For this reason, we are going to explore the locations, growth and development of EVs charging stations, through visualizations.
+
+
+# 2. Analysis
+
+## 2.1 Importing the Data
+
+In this step, the main source of data is going to be loaded in the environment.
+
+```{r}
+library(tidyverse)
+alt_fuel_stations <- read_csv("../data/alt_fuel_stations (Nov 5 2020).csv")
+
+```
+
+
+## 2.2 Growth of EV Stations
+
+In this section the growth of Electric Stations is going to be explored. This information will be reflected through visualizations as barplot, scatterplot and interactive maps that reflects how many electric stations were installed, in year periods.
+
+### Preparing the Data
+
+For getting only the Electric Vehicles Charging stations, a dataframe will be created called "ev_charging_stations" with the desired information filtered. After that, as we want to explore the data per year, the month, day and year will be separated in new columns, so the year can be taken independently.
+
+```{r}
+## Filter only EV Stations
+
+ev_charging_stations <- alt_fuel_stations %>%
+  filter(alt_fuel_stations["Fuel Type Code"] == "ELEC" & Country != "CA")
+
+## Separate Day, Month and Year
+
+ev_charging_stations <- ev_charging_stations %>%
+  separate(Open_Date, sep="/", into = c("Open_Month", "Open_Day", "Open_Year"), remove = FALSE)
+
+```
+
+After this, a new dataframe will be created, counting how many stations were opened, per year.
+
+```{r}
+# Number of EV chargers installed per year
+
+ev_charging_stations_per_year <- ev_charging_stations %>%
+  group_by(Open_Year) %>%
+  summarize(Count = n())
+
+```
+
+From the latest dataframe, the of the EV charging stations can be created. For this case, a scatterplot will be used.
+
+```{r}
+
+ggplot(ev_charging_stations_per_year, aes(x = Open_Year, y = Count, size = Count)) +
+  geom_point() +
+  labs(title = "EV Charging Station Growth", subtitle = "Per Year", x = "Year", y = "", caption = "Data Source: U.S. Dept of Energy") +
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
+  theme(legend.title = element_blank(), legend.position = "none")
+
+```
+
+As seen, there is a high ammount of data of the date when stations were opened that is missing. Therefore, it would be good to explore how much information is missing and if it is feasible to get a conclusion from there. 
+
+For this purpose, a percentage of the data we have and the one that is missing will be computed and imported as a new dataset to the environment.
+
+```{r}
+# Proportion data
+
+Open_Date_Availability <- read_csv("../data/Open_Date_Availability.csv")
+
+```
+
+For this case, a barplot that reflect proportions will be created.
+
+```{r}
+# Barplot
+
+ggplot(Open_Date_Availability, mapping = aes(x = Open_Year_Availability, y = Total)) + 
+  geom_bar(stat = 'identity', width = 0.6, aes(fill = c("red", "green"))) + 
+  geom_text(aes(label = paste(signif(Prop*100, 4), "%", sep = "")), nudge_y = 800) +
+  labs(title = "Opened Stations Date", subtitle = "Data Availability", x = "", y = "") +
+  theme(legend.position = "none", axis.text.y = element_blank(), panel.background = element_blank())
+
+```
+
+As seen in the graph, 57% of the Opened Station Date data is missing,  therefore is not fasible to use that information and drive conclusions from it. In this way, it is going to be explored how Chargers Stations are distributed along the United States and around the states.
+
+
+## 2.3 Electric Vehicles Charging Stations in US
+
+The chargers around United States are going to be shown in an interactive map of United States.
+
+```{r}
+library(sf)
+library(plotly)
+library(ggrepel)
+
+# Load map shapefile
+
+states_provinces <- read_sf("../data/ne_110m_admin_1_states_provinces/ne_110m_admin_1_states_provinces.shp")
+
+
+ggplot() +
+  geom_sf(data = states_provinces, col = "white") +
+  geom_text(data = states_provinces, aes(x = longitude, y = latitude, label = woe_name), size = 0.1) +
+  geom_point(data = ev_charging_stations, 
+             aes(x = Longitude, y = Latitude, label = `Station Name`), shape = 23, fill = "red") +
+  labs(title = "EV Charging Stations", subtitle = "United States", caption = "Data Source: U.S. Dept of Energy", x = "", y = "") +
+  theme(panel.background = element_rect(fill = "aliceblue"), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text.x = element_blank(), axis.text.y = element_blank())
+ggplotly()
+
+```
+
+At first glance, it seems that there are Electric Vehicles Charging Stations all over the United States, but let's explore state by state to see the reality of it.
+
+
+## 2.4 Charging Stations Comparison, per State
+
+For this comparison, let's explore the percentage of chargers per state. For visualizing this, a Treemap will be created. For this, a new data frame will be created, with the numbers of Charging Stations per State.
+
+```{r}
+
+ev_charging_stations_per_state <- ev_charging_stations %>%
+  group_by(State) %>%
+  summarize(Count = n()) %>%
+  mutate(Prop = paste(signif(Count/sum(Count)*100, 2), "%", sep = ""))
+
+```
+
+In the following step the Treemap visualization for the numbers of stations per state is going to be graphed.
+
+```{r}
+
+library(treemapify)
+ggplot(ev_charging_stations_per_state, aes(area = Count, fill = State, label = paste(State, Prop, separate = " "))) + 
+  geom_treemap(show.legend = FALSE) +
+  geom_treemap_text(fontface = "italic", colour = "white", place = "topleft", grow = FALSE) +
+  labs(title = "Charging Stations in US", subtitle = "Per State")
+
+```
+
+As seen in the treemap, a 25% of the EVs charging stations in the US are in the California, being the state with most chargers. That could be explained by the great development that Electric Vehicles had there. High gas prices, local tax incentives and high technology development could be contributing factors of that growth.
+
+As it is noticed, California is followed by New York, with a 6.4% and Florida with a 5.6%. In the following graphs, Charging Stations are going to be shown in the map to compare visually their density in the terrain.
+
+
+## 2.5 States Comparison Maps
+
+For doing maps, the data is going to be loaded.
+
+In the following step the California, New York and Florida maps will be plotted, along with the points of each stations.
+
+```{r}
+# Plotting the map
+
+## California
+
+### Data
+
+ev_charging_stations_california <- ev_charging_stations %>%
+  filter(State == "CA" & Longitude < -110)
+
+### Map
+
+california_map <- states_provinces[states_provinces$name == 'California',]
+ggplot() + 
+  geom_sf(data = california_map) +
+  geom_point(data = ev_charging_stations_california, 
+             aes(x = Longitude, y = Latitude), shape = 23, fill = "red") +
+  geom_label(data = ev_charging_stations_per_state, aes(x = -121, y = 32.5, label = paste("No. of Stations:", ev_charging_stations_per_state[5,2], sep = " ")))  +
+  theme(panel.background = element_rect(fill = "aliceblue"), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text.x = element_blank(), axis.text.y = element_blank()) +
+  labs(title = "EV Charging Stations", subtitle = "California", x = "", y = "")
+
+
+## New York
+
+### Data
+
+ev_charging_stations_newyork <- ev_charging_stations %>%
+  filter(State == "NY")
+
+### Map
+
+new_york_map <- states_provinces[states_provinces$name == 'New York',]
+ggplot() + 
+  geom_sf(data = new_york_map) +
+  geom_point(data = ev_charging_stations_newyork, 
+             aes(x = Longitude, y = Latitude), shape = 23, fill = "red") +
+  geom_label(data = ev_charging_stations_per_state, aes(x = -78, y = 41, label = paste("No. of Stations:", ev_charging_stations_per_state[35,2], sep = " ")))  +
+  theme(panel.background = element_rect(fill = "aliceblue"), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.text.x = element_blank(), axis.text.y = element_blank()) +
+  labs(title = "EV Charging Stations", subtitle = "New York", x = "", y = "")
+
+
+## Florida
+
+### Data
+
+ev_charging_stations_florida <- ev_charging_stations %>%
+  filter(State == "FL" & Latitude < "32")
+
+### Map
+
+florida_map <- states_provinces[states_provinces$name == 'Florida',]
+ggplot() + 
+  geom_sf(data = florida_map) +
+  geom_point(data = ev_charging_stations_florida, 
+             aes(x = Longitude, y = Latitude), shape = 23, fill = "red") +
+  geom_label(data = ev_charging_stations_per_state, aes(x = -85, y = 27, label = paste("No. of Stations:", ev_charging_stations_per_state[10,2], sep = " ")))  +
+  theme(panel.background = element_rect(fill = "aliceblue"), panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), axis.text.x = element_blank(), axis.text.y = element_blank()) +
+  labs(title = "EV Charging Stations", subtitle = "Florida", x = "", y = "")
+
+
+```
+
+
+As it is seen in the maps, California has more than 3 times more stations than New York and more than 4 times the stations that are in Florida. It can be seen that most of the California's stations are located in the west side, where most Popular Cities as Sacramento, San Francisco, Los Angeles and  San Diego are located. 
+
+In New York is noticable that most chargers are on the south, where the New York city is. The rest of the chargers are on places like Buffalo, Rochester, Syracuse and Albany.
+
+In Florida it is noticable that there are less Stations that the others states compared before, taking in cosideration that New York is a smaller state. Most of the chargers are on the East coast, were most popular beaches are located and in popular cities as Orlando, Tampa, Panama City, Jacksonville and Tallahassee.
+
+
+# 3. Conclusions
+
+After exploring the Electric Vehicles Charging Stations locations of United States, the final conclusion we can take is that there had been an inequal distribution of charging stations around states. The main (and also simplest) explanation of why this happens can be just due to demand. As California is known for being an epicenter of technological development and gas prices are high, buying electric vehicles make sense to many people there. Due to the advantages that EVs offer, that is something good for the transportation sector and also for the environment. Although, this isn't something good for the entire in terms of pursuing the sustainability, because most states keep adopting traditional technology that are more expensive in the long run, and is doing more harm to environment.
+
+
+# 4. Findings
+
+**a. What were the original charts you planned to create for this assignments? What steps were necessary for cleaning and preparing the data?**
+
+For this project I mainly wanted to focus on exploring the growth of Electric Stations, therefore I wanted to do a barplot, scatterplot and interactive maps that reflects how many electric stations were installed per year. As it was shown, more than the 50% of the information about when stations were opened was missing and therefore I focused on comparing how many stations are installed per state. The steps are described above.
+
+
+**b. What story could you tell with your plots?**
+
+Overall, the visualization shows that the EVs charging stations networks are being developed in California, and in the rest of the states you can find most of it in popular cities. Each of the plots have it's description below.
+
+
+**What difficulties did you encounter while creating the visualizations?**
+
+The one of the most difficult part is first subsetting the data correctly to integrate it to the type of graph that is desired. As the data is the base of what it is shown, is very important to get the correct information and to compute it correctly, so it can be plotted smoothly. 
+
+The other most difficul part is about incorporating important details in the graph. There are some things that once are included (or excluded) in the visualization, it makes the difference when it comes about telling a story. For example, I wanted to include the name of the city where Charging Stations are located in the same map, so people can see the information about when zooming in.
+
+
+**What additional approaches do you think can be use to explore the data you selected?**
+
+For this case, the Electric Stations growth would had been a great data to know how much the electric vehicles infrastructure is supporting the EVs market growth. Also, combining it with the information per state, we can know important information about if other states besides California are already installing chargers.
+
+Another interesting information to explore are the type of connectors. In US, there are 3 main type of connectors for EV charging: 1 of them used in Teslas vehicles and 2 of them used in others. It would be interesting to explore if it is just Tesla that is supporting this network growth or if there is really an interest from Charging Stations companies.
+
+
+**c. How did you apply the principles of data visualizations and design for this assignment?**
+
+In most visualizations I included only the necesary information. For example, axis information was not shown next to axis and legend and some overlapping information was hidden. In this way, the person seeing the graph can focus the attention on the story that the graph intends to tell.
+
+I used the size and colors for highlighting important points of graphs. For example, in the maps I wanted to apply contrast to terrain and sea colors, and that's why I applied a blue tone in the sea. Also, for giving the reader an physical idea of how much stations are in the US, but at the same time have a closer information about each charging station, I made the entire country map interactive. In this way, the reader can visualize the charging station density by proximity of the points.
+
+
+
+
+
