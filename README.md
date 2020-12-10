@@ -25,7 +25,6 @@ In this project, I explored the locations, growth and development of EVs chargin
 
 **Sample data visualization:** 
 
-_[include your favorite visualization from this project here]_
 <img src="https://github.com/jeanmenieur/dataviz_final_project/blob/main/figures/unnamed-chunk-10-3.png" width="80%" height="80%">
 
 
